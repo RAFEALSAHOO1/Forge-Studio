@@ -1,188 +1,298 @@
 # DesignForge Studio — Complete Frontend + Backend
 
-A **production-ready** premium design service platform built with Next.js 14, TypeScript, Tailwind CSS, and Framer Motion.
+A **production-ready** premium design service platform built with Next.js 14, TypeScript, Tailwind CSS, and Framer Motion. This is a full-stack web application for a design marketplace where users can browse, customize, and order design services.
 
----
+## ✨ Features
+
+- **🏠 Landing Page**: Cinematic hero sections, product highlights, and service showcases
+- **🛒 Product Catalog**: Browse designs by category (logos, websites, branding, etc.)
+- **🎨 Design Customizer (The Forge)**: Interactive design preview with real-time animations
+- **👤 User Authentication**: Google OAuth integration with NextAuth.js
+- **📊 Dashboard**: User profile, order history, and design management
+- **🛍️ Order System**: 3-step wizard for placing orders with payment integration
+- **💳 Payment Processing**: Stripe integration for secure payments
+- **📧 Email Notifications**: Automated emails via Resend
+- **📈 Analytics**: Google Analytics 4 integration
+- **🛡️ Admin Panel**: Manage orders, users, and platform analytics
+- **🌙 Dark/Light Theme**: System-aware theme switching
+- **📱 Responsive Design**: Mobile-first approach with liquid glass UI
+- **🔒 Security**: Rate limiting, CSRF protection, and secure headers
+- **⚡ Performance**: Optimized with Next.js 14, server-side rendering, and lazy loading
+
+## 🛠️ Tech Stack
+
+### Frontend
+- **Framework**: Next.js 14 (App Router)
+- **Language**: TypeScript
+- **Styling**: Tailwind CSS
+- **Animations**: Framer Motion
+- **Icons**: Lucide React
+- **UI Components**: Custom component library with glass morphism effects
+
+### Backend
+- **Runtime**: Node.js
+- **Database**: PostgreSQL (Neon)
+- **ORM**: Direct SQL queries with Neon serverless
+- **Authentication**: NextAuth.js with Google OAuth
+- **Payments**: Stripe
+- **Email**: Resend
+- **Analytics**: Google Analytics 4
+
+### DevOps & Tools
+- **Deployment**: Vercel
+- **Version Control**: Git
+- **Package Manager**: npm
+- **Linting**: ESLint
+- **Type Checking**: TypeScript
+- **Build Tool**: Next.js built-in
 
 ## 🚀 Quick Start
 
 ```bash
-# 1. Install dependencies
+# 1. Clone the repository
+git clone https://github.com/RAFEALSAHOO1/FORGE-STUDIO.git
+cd FORGE-STUDIO/designforge-studio
+
+# 2. Install dependencies
 npm install
 
-# 2. Copy env template
+# 3. Copy environment template
 cp .env.example .env.local
 
-# 3. Fill in your environment variables (see below)
+# 4. Fill in your environment variables (see Environment Variables section)
 
-# 4. Run development server
+# 5. Set up the database
+npm run db:setup
+
+# 6. Run development server
 npm run dev
 
-# 5. Open http://localhost:3000
+# 7. Open http://localhost:3000 in your browser
 ```
-
----
 
 ## 🌍 Environment Variables
 
-Create `.env.local` from the template below:
+Create `.env.local` from the template below. All variables are required for full functionality.
 
 ```env
-# ── App ────────────────────────────────────────────────────────────
+# ── App Configuration ────────────────────────────────────────────────────────────
 NEXT_PUBLIC_APP_URL=http://localhost:3000
+NEXT_PUBLIC_APP_NAME="DesignForge Studio"
 
-# ── Google Analytics ────────────────────────────────────────────────
+# ── Google Analytics 4 ───────────────────────────────────────────────────────────
+# Get from: analytics.google.com → Admin → Data Streams
 NEXT_PUBLIC_GA_ID=G-XXXXXXXXXX
 
-# ── Google OAuth (for real auth) ────────────────────────────────────
-GOOGLE_CLIENT_ID=your-google-client-id
-GOOGLE_CLIENT_SECRET=your-google-client-secret
+# ── Google OAuth ────────────────────────────────────────────────────────────────
+# Get from: console.cloud.google.com → APIs & Services → Credentials
+GOOGLE_CLIENT_ID=your-google-client-id.apps.googleusercontent.com
+GOOGLE_CLIENT_SECRET=GOCSPX-your-secret
 
-# ── Database (Neon / Supabase / PlanetScale) ────────────────────────
-DATABASE_URL=postgresql://user:pass@host/dbname
+# ── Database ────────────────────────────────────────────────────────────────────
+# Neon: neon.tech (recommended)
+# Supabase: supabase.com
+# Format: postgresql://user:password@host:5432/database
+DATABASE_URL=postgresql://neondb_owner:npg_PLdMq0RC8mVj@ep-lucky-sea-a1vwkk4d-pooler.ap-southeast-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require
+NEON_DATABASE_URL=postgresql://neondb_owner:npg_PLdMq0RC8mVj@ep-lucky-sea-a1vwkk4d-pooler.ap-southeast-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require
 
-# ── Stripe Payments ─────────────────────────────────────────────────
-STRIPE_SECRET_KEY=sk_test_...
-NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=pk_test_...
-STRIPE_WEBHOOK_SECRET=whsec_...
+# ── Stripe Payments ─────────────────────────────────────────────────────────────
+# Get from: dashboard.stripe.com → Developers → API Keys
+STRIPE_SECRET_KEY=sk_test_your_key_here
+NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=pk_test_your_key_here
+# Get webhook secret from: dashboard.stripe.com → Webhooks
+STRIPE_WEBHOOK_SECRET=whsec_your_webhook_secret
 
-# ── Email (Resend / SendGrid) ────────────────────────────────────────
-RESEND_API_KEY=re_...
+# ── Email Service ───────────────────────────────────────────────────────────────
+# Get from: resend.com → API Keys
+RESEND_API_KEY=re_your_api_key
 FROM_EMAIL=noreply@designforge.studio
+SUPPORT_EMAIL=support@designforge.studio
 
-# ── Auth Secret (NextAuth) ──────────────────────────────────────────
-NEXTAUTH_SECRET=generate-with-openssl-rand-base64-32
+# ── Authentication ──────────────────────────────────────────────────────────────
+# Generate with: openssl rand -base64 32
+NEXTAUTH_SECRET=your-generated-secret-here
 NEXTAUTH_URL=http://localhost:3000
-```
 
----
+# ── File Storage (Optional) ─────────────────────────────────────────────────────
+# Cloudflare R2 or AWS S3 for file uploads
+# R2_ACCESS_KEY_ID=
+# R2_SECRET_ACCESS_KEY=
+# R2_BUCKET_NAME=designforge-uploads
+# R2_ENDPOINT=https://xxx.r2.cloudflarestorage.com
+```
 
 ## 📁 Project Structure
 
 ```
 designforge-studio/
-├── app/
-│   ├── page.tsx                    ← Landing (loader + all sections)
-│   ├── layout.tsx                  ← Root layout + GA + fonts
-│   ├── globals.css                 ← Full design system
-│   ├── global-error.tsx            ← Global error boundary
-│   ├── error.tsx                   ← Page-level errors
-│   ├── not-found.tsx               ← 404 page
-│   ├── about/                      ← About page
-│   ├── browse/                     ← Browse all products
-│   │   └── [id]/                   ← Individual product page
-│   ├── contact/                    ← Contact form
-│   ├── login/                      ← Authentication
-│   ├── signup/                     ← Registration
-│   ├── dashboard/                  ← User dashboard
-│   ├── profile/                    ← User profile
-│   ├── settings/                   ← Settings (appearance/notifications/etc)
-│   ├── order/                      ← 3-step order wizard
-│   ├── order-tracking/             ← Order timeline + status
-│   ├── payment/                    ← Payment (card/PayPal/crypto)
-│   ├── admin/                      ← Admin panel (orders/users/overview)
-│   ├── forge/                      ← The Forge customizer
-│   ├── privacy/                    ← GDPR Privacy Policy
-│   ├── terms/                      ← Terms & Conditions
-│   ├── maintenance/                ← Maintenance page with countdown
-│   ├── status/                     ← System status page
-│   └── api/
-│       ├── designs/                ← Save/list custom designs
-│       ├── templates/              ← Browse products/templates
-│       ├── orders/                 ← Create/list orders
-│       ├── auth/                   ← Login/register/Google OAuth
-│       └── analytics/             ← Event tracking
-├── components/
-│   ├── layout/
-│   │   ├── Navbar.tsx              ← Glass pill navbar (all links)
-│   │   └── Footer.tsx              ← Full footer with legal links
-│   ├── sections/
-│   │   ├── HeroSection.tsx         ← Cinematic video hero
-│   │   ├── LandingSections.tsx     ← About/Featured/Philosophy/Services/CTA
-│   │   └── ProductHighlights.tsx   ← Category grid + featured products
-│   ├── heroes/
-│   │   ├── TargoHero.tsx           ← Logistics-style hero
-│   │   └── VEXHero.tsx             ← Animated typography hero
-│   └── ui/
-│       ├── LoadingScreen.tsx       ← Rotating words + counter + progress
-│       ├── UiverseButton.tsx       ← Sparkle letter-animation button
-│       ├── ThemeToggle.tsx         ← Sun/moon theme switcher
-│       ├── Checkbox.tsx            ← Gradient checkbox
-│       ├── Skeleton.tsx            ← Shimmer skeleton loaders
-│       ├── Card.tsx                ← Rotating-border card
-│       ├── PodaInput.tsx           ← Layered glow input
-│       ├── OrderTimeline.tsx       ← Animated order step timeline
-│       ├── AdminTable.tsx          ← Orders + users management tables
-│       ├── Toast.tsx               ← Toast notification system
-│       ├── Reviews.tsx             ← Star ratings + review cards
-│       ├── PageLoading.tsx         ← Page-level cube loader
-│       └── ForgeAnimations.tsx     ← Live design preview + particles
-├── lib/
-│   ├── products.ts                 ← 50+ product catalog (all categories)
-│   ├── theme-context.tsx           ← Dark/light/system theme
-│   └── utils.ts                   ← Rate limiting + analytics + helpers
-└── middleware.ts                   ← Security headers + rate limiting
+├── app/                          # Next.js App Router pages
+│   ├── page.tsx                  # Landing page with all sections
+│   ├── layout.tsx                # Root layout with fonts and analytics
+│   ├── globals.css               # Global styles and design system
+│   ├── error.tsx                 # Error boundary for pages
+│   ├── global-error.tsx          # Global error boundary
+│   ├── not-found.tsx             # 404 page
+│   ├── about/                    # About page
+│   ├── admin/                    # Admin dashboard
+│   ├── browse/                   # Product browsing
+│   │   ├── page.tsx              # Browse all products
+│   │   ├── [id]/                 # Individual product page
+│   │   └── category/[category]/  # Category-specific browsing
+│   ├── contact/                  # Contact form
+│   ├── dashboard/                # User dashboard
+│   ├── forge/                    # Design customizer
+│   ├── login/                    # Login page
+│   ├── signup/                   # Registration page
+│   ├── order/                    # Order placement wizard
+│   ├── order-tracking/           # Order status tracking
+│   ├── payment/                  # Payment processing
+│   ├── privacy/                  # Privacy policy
+│   ├── profile/                  # User profile
+│   ├── settings/                 # User settings
+│   ├── status/                   # System status
+│   ├── terms/                    # Terms of service
+│   └── api/                      # API routes
+│       ├── analytics/            # Analytics tracking
+│       ├── auth/                 # Authentication endpoints
+│       ├── designs/              # Design management
+│       │   └── [id]/             # Individual design operations
+│       ├── orders/               # Order management
+│       ├── payment/              # Payment webhooks
+│       │   ├── create/           # Create payment session
+│       │   ├── verify/           # Verify payment
+│       │   └── webhook/          # Stripe webhooks
+│       └── templates/            # Product templates
+├── components/                   # Reusable UI components
+│   ├── layout/                   # Layout components
+│   │   ├── Navbar.tsx            # Navigation bar
+│   │   └── Footer.tsx            # Footer
+│   ├── sections/                 # Page sections
+│   │   ├── HeroSection.tsx       # Hero section
+│   │   ├── LandingSections.tsx   # Landing page sections
+│   │   └── ProductHighlights.tsx # Product showcase
+│   ├── heroes/                   # Hero variants
+│   │   ├── TargoHero.tsx         # Logistics-style hero
+│   │   └── VEXHero.tsx           # Animated typography hero
+│   └── ui/                       # UI components
+│       ├── AdminTable.tsx        # Admin data tables
+│       ├── AnalyticsProvider.tsx # Analytics context
+│       ├── Card.tsx              # Card component
+│       ├── Checkbox.tsx          # Custom checkbox
+│       ├── ForgeAnimations.tsx   # Design animations
+│       ├── LoadingScreen.tsx     # Loading screen
+│       ├── MorphismEffects.tsx   # Glass morphism effects
+│       ├── OrderTimeline.tsx     # Order progress
+│       ├── PageLoading.tsx       # Page loader
+│       ├── PodaInput.tsx         # Custom input
+│       ├── Reviews.tsx           # Review components
+│       ├── Skeleton.tsx          # Loading skeletons
+│       ├── ThemeToggle.tsx       # Theme switcher
+│       ├── Toast.tsx             # Toast notifications
+│       └── UiverseButton.tsx     # Animated button
+├── lib/                          # Utility libraries
+│   ├── analytics.ts              # Analytics helpers
+│   ├── auth-context.tsx          # Authentication context
+│   ├── colors.ts                 # Color constants
+│   ├── db-config.ts              # Database configuration
+│   ├── db.ts                     # Database utilities
+│   ├── fonts.ts                  # Font loading
+│   ├── morphism-tokens.ts        # Design tokens
+│   ├── products.ts               # Product data
+│   ├── theme-context.tsx         # Theme context
+│   └── utils.ts                  # General utilities
+├── public/                       # Static assets
+├── scripts/                      # Setup and utility scripts
+│   ├── setup-db-pg.ts            # PostgreSQL setup
+│   ├── setup-db-simple.ts        # Simple setup
+│   ├── setup-db.ts               # Database setup
+│   └── test-db.ts                # Database testing
+├── .env.example                  # Environment template
+├── .gitignore                    # Git ignore rules
+├── middleware.ts                 # Next.js middleware
+├── next.config.mjs               # Next.js configuration
+├── next.config.ts                # Additional config
+├── package.json                  # Dependencies and scripts
+├── postcss.config.js             # PostCSS configuration
+├── README.md                     # This file
+├── schema.sql                    # Database schema
+├── tailwind.config.ts            # Tailwind configuration
+├── tsconfig.json                 # TypeScript configuration
+└── IMPLEMENTATION_SUMMARY.md     # Implementation details
 ```
-
----
 
 ## 🎨 Design System
 
-### Liquid Glass
-```css
-.liquid-glass { /* All glass elements */ }
-```
+### Liquid Glass Morphism
+The app features a custom "liquid glass" design system with:
+- **Glass Effects**: Backdrop blur, transparency, and subtle borders
+- **Morphing Animations**: Smooth transitions and hover effects
+- **Gradient Overlays**: Dynamic color shifts
+- **Particle Systems**: Interactive background elements
 
-### Colors
-- **Accent**: `#89AACC` / `#4E85BF`
-- **Background**: `#0a0a0a`
-- **Text**: `#f5f5f5`
-- **Muted**: `#888888`
+### Color Palette
+- **Primary**: `#89AACC` (Soft Blue)
+- **Secondary**: `#4E85BF` (Deep Blue)
+- **Background**: `#0a0a0a` (Dark)
+- **Surface**: Semi-transparent overlays
+- **Text**: `#f5f5f5` (Light)
+- **Muted**: `#888888` (Gray)
 
-### Fonts
-- **Display**: Instrument Serif (italic)
-- **UI**: Inter (300–600)
-- **Targo**: Rubik (bold)
+### Typography
+- **Display**: Instrument Serif (Italic for headings)
+- **Body**: Inter (300-600 weights)
+- **Accent**: Rubik (Bold for CTAs)
 
----
+## 🔌 API Endpoints
 
-## 🛠️ To Add Real Backend
+### Authentication
+- `POST /api/auth/signin/google` - Google OAuth login
+- `POST /api/auth/signup` - User registration
+- `POST /api/auth/signout` - Logout
 
-### 1. Database (Neon/Supabase)
-Replace in-memory stores in `app/api/*/route.ts` with:
-```ts
-import { neon } from '@neondatabase/serverless'
-const sql = neon(process.env.DATABASE_URL!)
-const results = await sql`SELECT * FROM designs WHERE user_id = ${userId}`
-```
+### Designs
+- `GET /api/designs` - List user designs
+- `POST /api/designs` - Create new design
+- `GET /api/designs/[id]` - Get design details
+- `PUT /api/designs/[id]` - Update design
+- `DELETE /api/designs/[id]` - Delete design
 
-### 2. Stripe Payments
-```ts
-import Stripe from 'stripe'
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!)
-const session = await stripe.checkout.sessions.create({ ... })
-```
+### Orders
+- `GET /api/orders` - List user orders
+- `POST /api/orders` - Create new order
 
-### 3. Google OAuth (NextAuth)
+### Products
+- `GET /api/templates` - List available products
+- `GET /api/templates/[id]` - Get product details
+
+### Payments
+- `POST /api/payment/create` - Create Stripe checkout session
+- `POST /api/payment/verify` - Verify payment completion
+- `POST /api/payment/webhook` - Stripe webhook handler
+
+### Analytics
+- `POST /api/analytics` - Track user events
+
+## 🛠️ Development Scripts
+
 ```bash
-npm install next-auth
+# Development
+npm run dev          # Start development server
+npm run build        # Build for production
+npm run start        # Start production server
+npm run lint         # Run ESLint
+npm run type-check   # Run TypeScript type checking
+
+# Database
+npm run db:setup     # Set up database schema
+npm run db:test      # Test database connection
+
+# Deployment
+npm run build        # Build the application
 ```
-Add `app/api/auth/[...nextauth]/route.ts` with GoogleProvider.
 
-### 4. Real Email (Resend)
-```bash
-npm install resend
-```
-```ts
-import { Resend } from 'resend'
-const resend = new Resend(process.env.RESEND_API_KEY)
-await resend.emails.send({ from, to, subject, html })
-```
+## 🚀 Deployment
 
----
-
-## 🚀 Deploy on Vercel
-
+### Vercel (Recommended)
 ```bash
 # Install Vercel CLI
 npm i -g vercel
@@ -190,9 +300,54 @@ npm i -g vercel
 # Deploy
 vercel
 
-# Set env vars in Vercel dashboard
-# vercel.com → Project → Settings → Environment Variables
+# Set environment variables in Vercel dashboard
+# Visit: vercel.com → Your Project → Settings → Environment Variables
 ```
+
+### Manual Deployment
+1. Build the application: `npm run build`
+2. Start production server: `npm run start`
+3. Configure reverse proxy (nginx/apache) for production
+
+## 🔧 Configuration
+
+### Database Setup
+The app uses PostgreSQL with the following schema:
+- `users` - User accounts
+- `designs` - User designs
+- `orders` - Order records
+
+Run `npm run db:setup` to initialize the database.
+
+### Payment Integration
+Stripe is configured for payment processing. Set up webhooks in your Stripe dashboard pointing to `/api/payment/webhook`.
+
+### Email Configuration
+Resend is used for transactional emails. Configure templates for order confirmations and notifications.
+
+## 🤝 Contributing
+
+1. Fork the repository
+2. Create a feature branch: `git checkout -b feature/your-feature`
+3. Commit changes: `git commit -am 'Add your feature'`
+4. Push to branch: `git push origin feature/your-feature`
+5. Submit a pull request
+
+## 📄 License
+
+This project is licensed under the MIT License - see the LICENSE file for details.
+
+## 📞 Support
+
+For support, email support@designforge.studio or create an issue in this repository.
+
+## 🙏 Acknowledgments
+
+- Next.js team for the amazing framework
+- Vercel for hosting and deployment
+- Tailwind CSS for utility-first styling
+- Framer Motion for animations
+- All contributors and open-source projects used
 
 ---
 
