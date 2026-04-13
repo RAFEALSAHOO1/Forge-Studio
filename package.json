@@ -1,4 +1,5 @@
 {
+<<<<<<< HEAD
   "name": "designforge-studio",
   "version": "1.0.0",
   "private": true,
@@ -37,5 +38,17 @@
     "postcss": "^8",
     "tailwindcss": "^3.4.0",
     "typescript": "^5"
+=======
+  "name": "forge-studio-workspace",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "cd designforge-studio/designforge-studio && npm run dev",
+    "dev:db": "cd designforge-studio/designforge-studio && npm run dev:db",
+    "setup": "cd designforge-studio/designforge-studio && npm install && npm run db:setup",
+    "build": "cd designforge-studio/designforge-studio && npm run build",
+    "lint": "cd designforge-studio/designforge-studio && npm run lint",
+    "type-check": "cd designforge-studio/designforge-studio && npm run type-check"
+>>>>>>> 33ad69f (Initial commit - add all project files)
   }
 }
