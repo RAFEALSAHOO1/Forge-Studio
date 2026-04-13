@@ -1,101 +1,137 @@
-import { NextRequest } from 'next/server'
-import { apiSuccess, apiError } from '@/lib/utils'
+import { NextRequest, NextResponse } from 'next/server'
+import { verifyWebhookSignature } from '@/lib/stripe'
+import { sql } from '@/lib/db'
 
-// ─── POST /api/payment/webhook ────────────────────────────────────────────────
-// Receives webhooks from Stripe and Razorpay
-
+/**
+ * POST /api/payment/webhook
+ * Stripe webhook endpoint to handle payment events
+ * Must be configured in Stripe Dashboard → Webhooks
+ * 
+ * Events to listen for:
+ * - checkout.session.completed: Payment successful
+ * - charge.refunded: Refund processed
+ */
 export async function POST(req: NextRequest) {
-  const signature = req.headers.get('stripe-signature')
-  const razorpaySignature = req.headers.get('x-razorpay-signature')
-
   try {
+    // Get raw body and signature
+    const signature = req.headers.get('stripe-signature')
+    if (!signature) {
+      return NextResponse.json({ error: 'Missing signature' }, { status: 400 })
+    }
+
     const body = await req.text()
 
-    // ── Stripe webhook ────────────────────────────────────────────────────────
-    if (signature) {
-      // Production:
-      // const event = stripe.webhooks.constructEvent(body, signature, process.env.STRIPE_WEBHOOK_SECRET!)
-      const event = JSON.parse(body)
+    // Verify webhook signature (critical security step)
+    const event = verifyWebhookSignature(body, signature)
 
-      switch (event.type) {
-        case 'payment_intent.succeeded':
-          await handleStripeSuccess(event.data.object)
-          break
-        case 'payment_intent.payment_failed':
-          await handleStripeFailure(event.data.object)
-          break
-        case 'charge.refunded':
-          await handleStripeRefund(event.data.object)
-          break
-        case 'checkout.session.completed':
-          await handleCheckoutComplete(event.data.object)
-          break
-        default:
-          console.log(`[webhook] Unhandled Stripe event: ${event.type}`)
+    // Handle specific event types
+    switch (event.type) {
+      case 'checkout.session.completed': {
+        const session = event.data.object as any
+        await handleCheckoutSessionCompleted(session)
+        break
       }
-      return apiSuccess({ received: true, gateway: 'stripe' })
+      case 'charge.refunded': {
+        const charge = event.data.object as any
+        await handleChargeRefunded(charge)
+        break
+      }
+      default:
+        console.log(`[webhook] Unhandled event type: ${event.type}`)
     }
 
-    // ── Razorpay webhook ──────────────────────────────────────────────────────
-    if (razorpaySignature) {
-      // Production:
-      // const crypto = require('crypto')
-      // const expectedSig = crypto.createHmac('sha256', process.env.RAZORPAY_WEBHOOK_SECRET!).update(body).digest('hex')
-      // if (razorpaySignature !== expectedSig) return apiError('Invalid signature', 400)
-      const event = JSON.parse(body)
-
-      switch (event.event) {
-        case 'payment.captured':
-          await handleRazorpaySuccess(event.payload.payment.entity)
-          break
-        case 'payment.failed':
-          await handleRazorpayFailure(event.payload.payment.entity)
-          break
-        case 'refund.created':
-          await handleRazorpayRefund(event.payload.refund.entity)
-          break
-        default:
-          console.log(`[webhook] Unhandled Razorpay event: ${event.event}`)
-      }
-      return apiSuccess({ received: true, gateway: 'razorpay' })
-    }
-
-    return apiError('Unknown webhook source', 400)
-  } catch (err) {
-    console.error('[webhook error]', err)
-    return apiError('Webhook processing failed', 500)
+    // Always return 200 to acknowledge receipt
+    return NextResponse.json({ received: true })
+  } catch (error) {
+    const err = error as Error
+    console.error('[webhook error]', err.message)
+    
+    // Return 400 for verification errors, 500 for processing errors
+    const statusCode = err.message.includes('verification') ? 400 : 500
+    return NextResponse.json(
+      { error: err.message || 'Webhook processing failed' },
+      { status: statusCode }
+    )
   }
 }
 
-// ─── Handlers ─────────────────────────────────────────────────────────────────
-async function handleStripeSuccess(paymentIntent: Record<string, unknown>) {
-  console.log('[Stripe] Payment succeeded:', paymentIntent.id)
-  // TODO: Update order status in DB, send confirmation email
+/**
+ * Handle checkout.session.completed event
+ * Called when a payment is successfully completed
+ * Updates order status to 'paid' and stores payment_id
+ */
+async function handleCheckoutSessionCompleted(session: any) {
+  const orderId = session.metadata?.orderId
+  const userId = session.metadata?.userId
+  const paymentId = session.payment_intent // Stripe payment intent ID
+
+  if (!orderId || !userId) {
+    console.warn('[webhook] Missing metadata in checkout session:', session.id)
+    return
+  }
+
+  try {
+    // Update order status to 'paid' and store payment_id
+    const result = (await sql`
+      UPDATE orders 
+      SET status = 'paid', payment_id = ${paymentId}, updated_at = NOW()
+      WHERE id = ${orderId} AND user_id = ${userId}
+      RETURNING id, status, payment_id
+    `) as any[]
+
+    if (result.length > 0) {
+      console.log('[webhook] Order marked as paid:', {
+        orderId,
+        paymentId,
+        sessionId: session.id,
+      })
+      
+      // TODO: Send confirmation email, trigger order processing, etc.
+    } else {
+      console.warn('[webhook] Order not found or user mismatch:', { orderId, userId })
+    }
+  } catch (error) {
+    const err = error as Error
+    console.error('[webhook] Failed to update order:', err.message)
+    throw error
+  }
 }
 
-async function handleStripeFailure(paymentIntent: Record<string, unknown>) {
-  console.log('[Stripe] Payment failed:', paymentIntent.id)
-  // TODO: Notify customer, update order status
-}
+/**
+ * Handle charge.refunded event
+ * Called when a refund is processed
+ * Updates order status to 'refunded'
+ */
+async function handleChargeRefunded(charge: any) {
+  const paymentId = charge.payment_intent
 
-async function handleStripeRefund(charge: Record<string, unknown>) {
-  console.log('[Stripe] Refund processed:', charge.id)
-  // TODO: Update order status, notify customer
-}
+  if (!paymentId) {
+    console.warn('[webhook] Missing payment_intent in charge:', charge.id)
+    return
+  }
 
-async function handleCheckoutComplete(session: Record<string, unknown>) {
-  console.log('[Stripe] Checkout completed:', session.id)
-}
+  try {
+    // Find order by payment_id and mark as refunded
+    const result = (await sql`
+      UPDATE orders 
+      SET status = 'refunded', updated_at = NOW()
+      WHERE payment_id = ${paymentId}
+      RETURNING id, user_id, status
+    `) as any[]
 
-async function handleRazorpaySuccess(payment: Record<string, unknown>) {
-  console.log('[Razorpay] UPI/NetBanking payment captured:', payment.id)
-  // TODO: Update order, send confirmation
-}
-
-async function handleRazorpayFailure(payment: Record<string, unknown>) {
-  console.log('[Razorpay] Payment failed:', payment.id)
-}
-
-async function handleRazorpayRefund(refund: Record<string, unknown>) {
-  console.log('[Razorpay] Refund created:', refund.id)
+    if (result.length > 0) {
+      console.log('[webhook] Order marked as refunded:', {
+        orderId: result[0].id,
+        chargeId: charge.id,
+      })
+      
+      // TODO: Notify customer of refund, send receipt, etc.
+    } else {
+      console.warn('[webhook] Order not found for refund:', paymentId)
+    }
+  } catch (error) {
+    const err = error as Error
+    console.error('[webhook] Failed to update order for refund:', err.message)
+    throw error
+  }
 }

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useRouter } from 'next/navigation'
 import {
@@ -32,13 +32,103 @@ export default function OrderPage() {
   const [step, setStep] = useState(0)
   const [selected, setSelected] = useState('')
   const [urgency, setUrgency] = useState(0)
+  const [userId, setUserId] = useState<string | null>(null)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
   const [details, setDetails] = useState({
     title: '', description: '', size: '',
     colorScheme: '', notes: '',
     revisions: false, printReady: false, brandGuide: false,
   })
 
+  // Get user ID from session on mount
+  useEffect(() => {
+    const fetchUser = async () => {
+      try {
+        const res = await fetch('/api/auth', { method: 'GET' })
+        if (res.ok) {
+          const data = await res.json()
+          setUserId(data.userId)
+        }
+      } catch (err) {
+        console.error('Failed to fetch user:', err)
+      }
+    }
+    fetchUser()
+  }, [])
+
   const canNext = step === 0 ? !!selected : step === 1 ? !!details.title : true
+
+  const handlePlaceOrder = async () => {
+    if (!userId) {
+      setError('Please log in to place an order')
+      router.push('/login')
+      return
+    }
+
+    setLoading(true)
+    setError(null)
+
+    try {
+      // Calculate total price
+      const basePrice = 89 // Placeholder - in production, fetch from service pricing
+      const urgencyPrice = parseInt(URGENCY_PRICES[urgency].replace(/\D/g, '') || '0')
+      const totalPrice = basePrice + urgencyPrice
+
+      // Create order
+      const orderRes = await fetch('/api/orders/create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId,
+          product_id: selected,
+          product_name: SERVICES.find(s => s.id === selected)?.label,
+          amount: totalPrice * 100, // Convert to cents
+          currency: 'USD',
+          details: {
+            ...details,
+            urgency: URGENCY[urgency],
+          },
+        }),
+      })
+
+      if (!orderRes.ok) {
+        throw new Error('Failed to create order')
+      }
+
+      const order = await orderRes.json()
+      const orderId = order.id
+
+      // Create Stripe checkout session
+      const checkoutRes = await fetch('/api/payment/checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          orderId,
+          userId,
+        }),
+      })
+
+      if (!checkoutRes.ok) {
+        throw new Error('Failed to create payment session')
+      }
+
+      const { url } = await checkoutRes.json()
+
+      // Redirect to Stripe checkout
+      if (url) {
+        window.location.href = url
+      } else {
+        throw new Error('No checkout URL received')
+      }
+    } catch (err) {
+      const errorMsg = err instanceof Error ? err.message : 'An error occurred'
+      setError(errorMsg)
+      console.error('Order creation error:', err)
+    } finally {
+      setLoading(false)
+    }
+  }
 
   return (
     <div className="min-h-screen bg-black">
@@ -192,7 +282,26 @@ export default function OrderPage() {
                   </div>
                 </div>
                 <div className="flex justify-center">
-                  <UiverseButton text="Place Order" secondText="Processing" onClick={() => router.push('/order-tracking')} />
+                  {error && (
+                    <motion.div
+                      initial={{ opacity: 0, y: -10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className="mb-6 p-4 bg-red-500/10 border border-red-500/30 rounded-lg text-red-400 text-sm text-center w-full"
+                    >
+                      {error}
+                    </motion.div>
+                  )}
+                  <button
+                    onClick={handlePlaceOrder}
+                    disabled={loading || !userId}
+                    className={`px-8 py-3 rounded-full font-semibold text-white transition-all ${
+                      loading || !userId
+                        ? 'bg-white/50 cursor-not-allowed'
+                        : 'bg-white hover:bg-white/90'
+                    }`}
+                  >
+                    {loading ? 'Processing...' : !userId ? 'Loading...' : 'Proceed to Payment'}
+                  </button>
                 </div>
               </div>
             </motion.div>
