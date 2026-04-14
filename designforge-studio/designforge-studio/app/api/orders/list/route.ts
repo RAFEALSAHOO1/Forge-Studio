@@ -3,14 +3,30 @@ import { apiSuccess, apiError } from '@/lib/utils'
 import { ensureDBInitialized } from '@/lib/db-init'
 import { sql } from '@/lib/db'
 import { verifyToken, extractTokenFromCookies } from '@/lib/jwt'
+import { getCache, setCache, deleteCache } from '@/lib/cache'
+import { checkRateLimit } from '@/lib/rate-limit-redis'
 
 /**
  * GET /api/orders/list
  * Fetch orders for a user (dashboard)
  * Query params: status, limit, offset
+ * 
+ * Features:
+ * - Rate limited: 30 requests/minute per IP
+ * - Cached: Results cached for 5 minutes (60 second cache for dynamic lists)
+ * - Authentication: Requires valid JWT token
  */
 export async function GET(req: NextRequest) {
   try {
+    // ── Rate limiting ─────────────────────────────────────────────────
+    const rateLimitCheck = await checkRateLimit(req, 'orders')
+    if (!rateLimitCheck.allowed) {
+      return apiError(rateLimitCheck.message || 'Rate limit exceeded', 429, {
+        'X-RateLimit-Remaining': String(rateLimitCheck.remaining),
+        'X-RateLimit-Reset': String(Math.ceil(rateLimitCheck.resetTime / 1000)),
+      })
+    }
+
     await ensureDBInitialized()
 
     // ── Authenticate user via JWT from cookies ────────────────────────
@@ -30,6 +46,15 @@ export async function GET(req: NextRequest) {
     const status = searchParams.get('status')
     const limit = Math.min(50, Number(searchParams.get('limit')) || 10)
     const offset = Math.max(0, Number(searchParams.get('offset')) || 0)
+
+    // ── Check cache for this query ────────────────────────────────────
+    const cacheKey = `orders:user:${userId}:status:${status || 'all'}:limit:${limit}:offset:${offset}`
+    const cachedOrders = await getCache<any>(cacheKey)
+    
+    if (cachedOrders) {
+      console.log(`[cache-hit] Orders list for user ${userId}`)
+      return apiSuccess(cachedOrders, 200)
+    }
 
     // Build where clause
     let whereClause = sql`WHERE user_id = ${userId}`
@@ -61,7 +86,7 @@ export async function GET(req: NextRequest) {
       LIMIT ${limit} OFFSET ${offset}
     `) as any[]
 
-    return apiSuccess({
+    const responseData = {
       orders: (orders || []).map(o => ({
         id: o.id,
         productName: o.product_name,
@@ -78,7 +103,13 @@ export async function GET(req: NextRequest) {
         offset,
         hasMore: offset + limit < total,
       },
-    })
+    }
+
+    // ── Cache the results for 60 seconds ──────────────────────────────
+    await setCache(cacheKey, responseData, 60)
+    console.log(`[cache-set] Orders list for user ${userId}`)
+
+    return apiSuccess(responseData)
   } catch (error) {
     console.error('Fetch orders error:', error)
     const message = error instanceof Error ? error.message : 'Failed to fetch orders'

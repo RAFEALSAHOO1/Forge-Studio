@@ -1,17 +1,27 @@
 import { NextRequest } from 'next/server'
-import { rateLimit, apiSuccess, apiError, sanitizeString } from '@/lib/utils'
+import { apiSuccess, apiError, sanitizeString } from '@/lib/utils'
 import { ensureDBInitialized } from '@/lib/db-init'
 import { sql } from '@/lib/db'
 import { verifyToken, extractTokenFromCookies } from '@/lib/jwt'
+import { deleteCache } from '@/lib/cache'
+import { checkRateLimit } from '@/lib/rate-limit-redis'
 
 /**
  * POST /api/orders/create
  * Create a new order from Forge design
+ * 
+ * Rate limited: 30 requests/minute per IP
+ * Clears cache on successful order creation
  */
 export async function POST(req: NextRequest) {
-  const ip = req.headers.get('x-forwarded-for') ?? 'unknown'
-  const { allowed } = rateLimit(`orders-${ip}`, 20, 60_000)
-  if (!allowed) return apiError('Too many requests. Wait 1 minute.', 429)
+  // ── Rate limiting (orders: 30 req/min) ────────────────────────────
+  const rateLimitCheck = await checkRateLimit(req, 'orders')
+  if (!rateLimitCheck.allowed) {
+    return apiError(rateLimitCheck.message || 'Rate limit exceeded', 429, {
+      'X-RateLimit-Remaining': String(rateLimitCheck.remaining),
+      'X-RateLimit-Reset': String(Math.ceil(rateLimitCheck.resetTime / 1000)),
+    })
+  }
 
   try {
     await ensureDBInitialized()
@@ -59,6 +69,12 @@ export async function POST(req: NextRequest) {
 
     // ── Prepare order data ────────────────────────────────────────────
     const orderAmount = amount || 2900 // Default: $29.00 in cents
+    
+    // Validate amount is positive
+    if (orderAmount < 0) {
+      return apiError('Order amount must be positive', 400)
+    }
+    
     const sanitizedCategory = sanitizeString(category, 50) || 'general'
     const sanitizedNotes = sanitizeString(notes, 5000) || ''
 
@@ -100,6 +116,26 @@ export async function POST(req: NextRequest) {
     }
 
     const order = result[0]
+
+    // ── Clear cache for this user's orders (any status filter) ────────
+    // Cache keys to invalidate: orders:user:{userId}:status:{status}:*
+    const cachePatterns = [
+      `orders:user:${userId}:status:all:`,
+      `orders:user:${userId}:status:pending:`,
+      `orders:user:${userId}:status:progress:`,
+      `orders:user:${userId}:status:completed:`,
+      `orders:user:${userId}:status:cancelled:`,
+    ]
+    
+    for (const pattern of cachePatterns) {
+      // Delete common cache key variations
+      for (let limit = 10; limit <= 50; limit += 10) {
+        for (let offset = 0; offset < 50; offset += 10) {
+          await deleteCache(`${pattern}limit:${limit}:offset:${offset}`)
+        }
+      }
+    }
+    console.log(`[cache-clear] Invalidated orders list cache for user ${userId}`)
 
     return apiSuccess(
       {

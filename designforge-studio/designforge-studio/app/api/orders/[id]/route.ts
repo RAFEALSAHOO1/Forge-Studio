@@ -31,6 +31,12 @@ export async function GET(
     const userId = payload.userId
     const orderId = params.id
 
+    // Validate orderId is a number
+    const orderIdNum = parseInt(orderId, 10)
+    if (isNaN(orderIdNum)) {
+      return apiError('Invalid order ID format', 400)
+    }
+
     const result = (await sql`
       SELECT 
         id, 
@@ -43,7 +49,7 @@ export async function GET(
         details,
         created_at
       FROM orders 
-      WHERE id = ${orderId}
+      WHERE id = ${orderIdNum}
     `) as any[]
 
     if (!result || result.length === 0) {

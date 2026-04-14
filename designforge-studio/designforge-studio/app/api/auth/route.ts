@@ -1,15 +1,25 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { rateLimit, apiSuccess, apiError, sanitizeString, sanitizeEmail } from '@/lib/utils'
+import { apiSuccess, apiError, sanitizeString, sanitizeEmail } from '@/lib/utils'
 import { signup, login } from '@/lib/auth'
 import { ensureDBInitialized } from '@/lib/db-init'
 import { sql } from '@/lib/db'
 import { generateToken, verifyToken, extractTokenFromCookies } from '@/lib/jwt'
+import { checkRateLimit } from '@/lib/rate-limit-redis'
 
 // ─── POST /api/auth — signup / login ──────────────────────────────────────────
+/**
+ * Rate limited: 10 requests/minute per IP (strict auth limit)
+ * Handles signup and login actions
+ */
 export async function POST(req: NextRequest) {
-  const ip = req.headers.get('x-forwarded-for') ?? 'unknown'
-  const { allowed } = rateLimit(`auth-${ip}`, 10, 60_000)
-  if (!allowed) return apiError('Too many auth attempts. Wait 1 minute.', 429)
+  // ── Rate limiting (auth: 10 req/min) ──────────────────────────────
+  const rateLimitCheck = await checkRateLimit(req, 'auth')
+  if (!rateLimitCheck.allowed) {
+    return apiError(rateLimitCheck.message || 'Too many auth attempts', 429, {
+      'X-RateLimit-Remaining': String(rateLimitCheck.remaining),
+      'X-RateLimit-Reset': String(Math.ceil(rateLimitCheck.resetTime / 1000)),
+    })
+  }
 
   try {
     // Ensure database is initialized
@@ -138,7 +148,20 @@ export async function POST(req: NextRequest) {
 }
 
 // ─── GET /api/auth — verify session ──────────────────────────────────────────
+/**
+ * Rate limited: 10 requests/minute per IP
+ * Verifies JWT and returns user info
+ */
 export async function GET(req: NextRequest) {
+  // ── Rate limiting (auth: 10 req/min) ──────────────────────────────
+  const rateLimitCheck = await checkRateLimit(req, 'auth')
+  if (!rateLimitCheck.allowed) {
+    return apiError(rateLimitCheck.message || 'Too many requests', 429, {
+      'X-RateLimit-Remaining': String(rateLimitCheck.remaining),
+      'X-RateLimit-Reset': String(Math.ceil(rateLimitCheck.resetTime / 1000)),
+    })
+  }
+
   try {
     // Extract JWT token from HTTP-only cookie
     const token = extractTokenFromCookies(req.headers.get('cookie'))

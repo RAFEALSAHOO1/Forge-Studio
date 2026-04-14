@@ -1,6 +1,8 @@
 import { NextRequest } from 'next/server'
 import sql from '@/lib/db'
-import { rateLimit, apiSuccess, apiError, sanitizeString } from '@/lib/utils'
+import { apiSuccess, apiError, sanitizeString } from '@/lib/utils'
+import { getCache, setCache, deleteCache } from '@/lib/cache'
+import { checkRateLimit } from '@/lib/rate-limit-redis'
 
 // ─── Design interface ────────────────────────────────────────────────────────
 interface Design {
@@ -21,12 +23,18 @@ interface Design {
 }
 
 // ─── POST /api/designs — create a new design ─────────────────────────────────
+/**
+ * Rate limited: 30 requests/minute per IP
+ * Clears cache for designs list on successful creation
+ */
 export async function POST(req: NextRequest) {
-  const ip = req.headers.get('x-forwarded-for') ?? 'unknown'
-  const { allowed, remaining } = rateLimit(`designs-create-${ip}`, 30, 60_000)
-
-  if (!allowed) {
-    return apiError('Too many requests. Please slow down.', 429)
+  // ── Rate limiting ─────────────────────────────────────────────────
+  const rateLimitCheck = await checkRateLimit(req, 'api')
+  if (!rateLimitCheck.allowed) {
+    return apiError(rateLimitCheck.message || 'Rate limit exceeded', 429, {
+      'X-RateLimit-Remaining': String(rateLimitCheck.remaining),
+      'X-RateLimit-Reset': String(Math.ceil(rateLimitCheck.resetTime / 1000)),
+    })
   }
 
   try {
@@ -60,6 +68,11 @@ export async function POST(req: NextRequest) {
 
     const createdDesign = (result as any[])[0]
 
+    // ── Clear cache for designs list ──────────────────────────────────
+    await deleteCache(`designs:list:all`)
+    await deleteCache(`designs:list:draft`)
+    console.log(`[cache-clear] Invalidated designs list cache`)
+
     return apiSuccess({ design: createdDesign }, 201)
   } catch (error) {
     console.error('Create design error:', error)
@@ -67,11 +80,20 @@ export async function POST(req: NextRequest) {
   }
 }
 
-// ─── GET /api/designs — list user's designs ───────────────────────────────────
+// ─── GET /api/designs — list designs (cached) ────────────────────────────────
+/**
+ * Cached responses (60 seconds)
+ * Rate limited: 100 requests/minute per IP (api type)
+ */
 export async function GET(req: NextRequest) {
-  const ip = req.headers.get('x-forwarded-for') ?? 'unknown'
-  const { allowed } = rateLimit(`designs-list-${ip}`, 120, 60_000)
-  if (!allowed) return apiError('Rate limit exceeded', 429)
+  // ── Rate limiting ─────────────────────────────────────────────────
+  const rateLimitCheck = await checkRateLimit(req, 'api')
+  if (!rateLimitCheck.allowed) {
+    return apiError(rateLimitCheck.message || 'Rate limit exceeded', 429, {
+      'X-RateLimit-Remaining': String(rateLimitCheck.remaining),
+      'X-RateLimit-Reset': String(Math.ceil(rateLimitCheck.resetTime / 1000)),
+    })
+  }
 
   try {
     const { searchParams } = new URL(req.url)
@@ -80,6 +102,15 @@ export async function GET(req: NextRequest) {
     const page = Math.max(1, Number(searchParams.get('page')) || 1)
     const limit = Math.min(50, Number(searchParams.get('limit')) || 10)
     const offset = (page - 1) * limit
+
+    // ── Check cache first ─────────────────────────────────────────────
+    const cacheKey = `designs:${userId || 'all'}:${status || 'all'}:page:${page}:limit:${limit}`
+    const cachedDesigns = await getCache<any>(cacheKey)
+    
+    if (cachedDesigns) {
+      console.log(`[cache-hit] Designs list (userId: ${userId || 'all'}, status: ${status || 'all'})`)
+      return apiSuccess(cachedDesigns)
+    }
 
     let whereClause = sql``
     const params: any[] = []
@@ -107,7 +138,7 @@ export async function GET(req: NextRequest) {
       LIMIT ${limit} OFFSET ${offset}
     `
 
-    return apiSuccess({
+    const responseData = {
       designs,
       pagination: {
         page,
@@ -115,7 +146,13 @@ export async function GET(req: NextRequest) {
         total,
         pages: Math.ceil(total / limit),
       },
-    })
+    }
+
+    // ── Cache the results for 60 seconds ──────────────────────────────
+    await setCache(cacheKey, responseData, 60)
+    console.log(`[cache-set] Designs list (userId: ${userId || 'all'}, status: ${status || 'all'})`)
+
+    return apiSuccess(responseData)
   } catch (error) {
     console.error('List designs error:', error)
     return apiError('Failed to fetch designs', 500)

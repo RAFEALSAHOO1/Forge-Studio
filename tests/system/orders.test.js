@@ -62,10 +62,10 @@ async function testCreateOrder(authToken) {
 
     const data = await response.json().catch(() => null)
 
-    if ((response.status === 201 || response.status === 200) && data?.orderId) {
-      testOrderId = data.orderId
+    if ((response.status === 201 || response.status === 200) && data?.data?.orderId) {
+      testOrderId = data.data.orderId
       logResult(testName, true,
-        `Status: ${response.status}, Order ID: ${data.orderId}`)
+        `Status: ${response.status}, Order ID: ${data.data.orderId}`)
     } else {
       logResult(testName, false,
         `Expected 201/200 with orderId, got ${response.status}. Data: ${JSON.stringify(data)}`)
@@ -88,9 +88,9 @@ async function testListOrders(authToken) {
 
     const data = await response.json().catch(() => null)
 
-    if (response.status === 200 && Array.isArray(data?.orders)) {
+    if (response.status === 200 && Array.isArray(data?.data?.orders)) {
       logResult(testName, true,
-        `Status: ${response.status}, Orders: ${data.orders.length}`)
+        `Status: ${response.status}, Orders: ${data.data.orders.length}`)
     } else {
       logResult(testName, false,
         `Expected 200 with orders array, got ${response.status}`)
@@ -113,9 +113,10 @@ async function testFetchOrder(authToken) {
 
     const data = await response.json().catch(() => null)
 
-    if (response.status === 200 && data?.id === testOrderId) {
+    if (response.status === 200 && data?.data?.order?.id === testOrderId) {
+      const order = data.data.order
       logResult(testName, true,
-        `Status: ${response.status}, Order: ${data.id}, Amount: ${data.amount}`)
+        `Status: ${response.status}, Order: ${order.id}, Amount: ${order.amount}`)
     } else {
       logResult(testName, false,
         `Expected 200 with order data, got ${response.status}`)
@@ -144,7 +145,7 @@ async function testNotFoundOrder(authToken) {
   const testName = 'Orders Not Found - Invalid order ID'
 
   try {
-    const fakeOrderId = 'fake-nonexistent-order-12345'
+    const fakeOrderId = 999999 // Use a non-existent but valid integer ID
     const response = await fetch(`${BASE_URL}/api/orders/${fakeOrderId}`, {
       method: 'GET',
       headers: {

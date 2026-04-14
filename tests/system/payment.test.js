@@ -49,8 +49,8 @@ async function createPaymentTestOrder(authToken) {
     })
 
     const data = await response.json().catch(() => null)
-    if (response.status === 201 && data?.orderId) {
-      testPaymentOrderId = data.orderId
+    if (response.status === 201 && data?.data?.orderId) {
+      testPaymentOrderId = data.data.orderId
     }
   } catch (error) {
     console.error('Failed to create test order for payment:', error.message)

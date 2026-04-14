@@ -56,7 +56,7 @@ async function testWrongOrderId(authToken) {
   const testName = 'Security Wrong ID - Non-existent order'
 
   try {
-    const fakeId = 'order-id-that-does-not-exist-12345'
+    const fakeId = 999999 // Use a non-existent but valid integer ID
     const response = await fetch(`${BASE_URL}/api/orders/${fakeId}`, {
       method: 'GET',
       headers: {
